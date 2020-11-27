@@ -891,10 +891,11 @@ char *freq_to_str(uint64_t freq_hz)
     double freq = freq_hz;
     size_t idx = 0;
 
-    while (freq >= 1000.0 && idx < ARRAY_SIZE(suffixes)) {
+    while (freq >= 1000.0) {
         freq /= 1000.0;
         idx++;
     }
+    assert(idx < ARRAY_SIZE(suffixes));
 
     return g_strdup_printf("%0.3g %sHz", freq, suffixes[idx]);
 }
@@ -937,7 +938,7 @@ char *get_relocated_path(const char *dir)
     /* Fail if qemu_init_exec_dir was not called.  */
     assert(exec_dir[0]);
     if (!starts_with_prefix(dir) || !starts_with_prefix(bindir)) {
-        return strdup(dir);
+        return g_strdup(dir);
     }
 
     result = g_string_new(exec_dir);

@@ -112,7 +112,7 @@ L: qemu-s390x@nongnu.org
 Guest CPU cores (TCG)
 ---------------------
 Overall TCG CPUs
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 R: Paolo Bonzini <pbonzini@redhat.com>
 S: Maintained
 F: softmmu/cpus.c
@@ -138,7 +138,7 @@ F: include/fpu/
 F: tests/fp/
 
 Alpha TCG CPUs
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 S: Maintained
 F: target/alpha/
 F: tests/tcg/alpha/
@@ -158,6 +158,7 @@ F: disas/arm.c
 F: disas/arm-a64.cc
 F: disas/libvixl/
 F: docs/system/target-arm.rst
+F: docs/system/arm/cpu-features.rst
 
 ARM SMMU
 M: Eric Auger <eric.auger@redhat.com>
@@ -185,7 +186,7 @@ F: tests/tcg/cris/
 F: disas/cris.c
 
 HPPA (PA-RISC) TCG CPUs
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 S: Maintained
 F: target/hppa/
 F: hw/hppa/
@@ -227,7 +228,7 @@ R: Aleksandar Rikalo <aleksandar.rikalo@syrmia.com>
 S: Odd Fixes
 F: target/mips/
 F: default-configs/*mips*
-F: disas/*mips*
+F: disas/mips.c
 F: docs/system/cpu-models-mips.rst.inc
 F: hw/intc/mips_gic.c
 F: hw/mips/
@@ -239,6 +240,10 @@ F: include/hw/misc/mips_*
 F: include/hw/timer/mips_gictimer.h
 F: tests/tcg/mips/
 K: ^Subject:.*(?i)mips
+
+MIPS TCG CPUs (nanoMIPS ISA)
+S: Orphan
+F: disas/nanomips.*
 
 Moxie TCG CPUs
 M: Anthony Green <green@moxielogic.com>
@@ -289,11 +294,11 @@ F: linux-user/host/riscv64/
 
 RENESAS RX CPUs
 M: Yoshinori Sato <ysato@users.sourceforge.jp>
-S: Maintained
+S: Odd Fixes
 F: target/rx/
 
 S390 TCG CPUs
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 M: David Hildenbrand <david@redhat.com>
 S: Maintained
 F: target/s390x/
@@ -329,7 +334,7 @@ F: include/hw/unicore32/
 
 X86 TCG CPUs
 M: Paolo Bonzini <pbonzini@redhat.com>
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 M: Eduardo Habkost <ehabkost@redhat.com>
 S: Maintained
 F: target/i386/
@@ -426,7 +431,7 @@ F: scripts/kvm/vmxcap
 Guest CPU Cores (other accelerators)
 ------------------------------------
 Overall
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 R: Paolo Bonzini <pbonzini@redhat.com>
 S: Maintained
 F: include/sysemu/accel.h
@@ -530,7 +535,7 @@ F: qemu.nsi
 
 Alpha Machines
 --------------
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 S: Maintained
 F: hw/alpha/
 F: hw/isa/smc37c669-superio.c
@@ -554,7 +559,7 @@ S: Maintained
 F: hw/*/allwinner-h3*
 F: include/hw/*/allwinner-h3*
 F: hw/arm/orangepi.c
-F: docs/system/orangepi.rst
+F: docs/system/arm/orangepi.rst
 
 ARM PrimeCell and CMSDK devices
 M: Peter Maydell <peter.maydell@linaro.org>
@@ -758,6 +763,7 @@ F: include/hw/*/npcm7xx*
 F: tests/qtest/npcm7xx*
 F: pc-bios/npcm7xx_bootrom.bin
 F: roms/vbootrom
+F: docs/system/arm/nuvoton.rst
 
 nSeries
 M: Andrzej Zaborowski <balrogg@gmail.com>
@@ -797,6 +803,7 @@ F: hw/arm/raspi_platform.h
 F: hw/*/bcm283*
 F: include/hw/arm/raspi*
 F: include/hw/*/bcm283*
+F: docs/system/arm/raspi.rst
 
 Real View
 M: Peter Maydell <peter.maydell@linaro.org>
@@ -851,6 +858,7 @@ R: Leif Lindholm <leif@nuviainc.com>
 L: qemu-arm@nongnu.org
 S: Maintained
 F: hw/arm/sbsa-ref.c
+F: docs/system/arm/sbsa.rst
 
 Sharp SL-5500 (Collie) PDA
 M: Peter Maydell <peter.maydell@linaro.org>
@@ -995,6 +1003,7 @@ F: include/hw/*/*aspeed*
 F: include/hw/misc/pca9552*.h
 F: hw/net/ftgmac100.c
 F: include/hw/net/ftgmac100.h
+F: docs/system/arm/aspeed.rst
 
 NRF51
 M: Joel Stanley <joel@jms.id.au>
@@ -1040,7 +1049,7 @@ F: hw/*/etraxfs_*.c
 HP-PARISC Machines
 ------------------
 HP B160L
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 R: Helge Deller <deller@gmx.de>
 S: Odd Fixes
 F: default-configs/hppa-softmmu.mak
@@ -1137,12 +1146,6 @@ R: Aleksandar Rikalo <aleksandar.rikalo@syrmia.com>
 S: Orphaned
 F: hw/mips/mipssim.c
 F: hw/net/mipsnet.c
-
-R4000
-R: Aurelien Jarno <aurelien@aurel32.net>
-R: Aleksandar Rikalo <aleksandar.rikalo@syrmia.com>
-S: Obsolete
-F: hw/mips/r4k.c
 
 Fuloong 2E
 M: Huacai Chen <chenhc@lemote.com>
@@ -1327,14 +1330,20 @@ L: qemu-riscv@nongnu.org
 S: Supported
 F: hw/riscv/microchip_pfsoc.c
 F: hw/char/mchp_pfsoc_mmuart.c
+F: hw/misc/mchp_pfsoc_dmc.c
+F: hw/misc/mchp_pfsoc_ioscb.c
+F: hw/misc/mchp_pfsoc_sysreg.c
 F: include/hw/riscv/microchip_pfsoc.h
 F: include/hw/char/mchp_pfsoc_mmuart.h
+F: include/hw/misc/mchp_pfsoc_dmc.h
+F: include/hw/misc/mchp_pfsoc_ioscb.h
+F: include/hw/misc/mchp_pfsoc_sysreg.h
 
 RX Machines
 -----------
 rx-gdbsim
 M: Yoshinori Sato <ysato@users.sourceforge.jp>
-S: Maintained
+S: Odd Fixes
 F: docs/system/target-rx.rst
 F: hw/rx/rx-gdbsim.c
 F: tests/acceptance/machine_rx_gdbsim.py
@@ -1344,7 +1353,7 @@ SH4 Machines
 R2D
 M: Yoshinori Sato <ysato@users.sourceforge.jp>
 R: Magnus Damm <magnus.damm@gmail.com>
-S: Maintained
+S: Odd Fixes
 F: hw/sh4/r2d.c
 F: hw/intc/sh_intc.c
 F: include/hw/sh4/sh_intc.h
@@ -1436,6 +1445,7 @@ S390 PCI
 M: Matthew Rosato <mjrosato@linux.ibm.com>
 S: Supported
 F: hw/s390x/s390-pci*
+F: include/hw/s390x/s390-pci*
 L: qemu-s390x@nongnu.org
 
 UniCore32 Machines
@@ -1598,6 +1608,7 @@ L: qemu-arm@nongnu.org
 S: Maintained
 F: hw/*/omap*
 F: include/hw/arm/omap.h
+F: docs/system/arm/sx1.rst
 
 IPack
 M: Alberto Garcia <berto@igalia.com>
@@ -1877,7 +1888,9 @@ M: Klaus Jensen <its@irrelevant.dk>
 L: qemu-block@nongnu.org
 S: Supported
 F: hw/block/nvme*
+F: include/block/nvme.h
 F: tests/qtest/nvme-test.c
+F: docs/specs/nvme.txt
 T: git git://git.infradead.org/qemu-nvme.git nvme-next
 
 megasas
@@ -1907,6 +1920,7 @@ Rocker
 M: Jiri Pirko <jiri@resnulli.us>
 S: Maintained
 F: hw/net/rocker/
+F: qapi/rocker.json
 F: tests/rocker/
 F: docs/specs/rocker.txt
 
@@ -2075,7 +2089,7 @@ F: docs/*/*xive*
 Renesas peripherals
 M: Yoshinori Sato <ysato@users.sourceforge.jp>
 R: Magnus Damm <magnus.damm@gmail.com>
-S: Maintained
+S: Odd Fixes
 F: hw/char/renesas_sci.c
 F: hw/char/sh_serial.c
 F: hw/timer/renesas_*.c
@@ -2086,7 +2100,7 @@ F: include/hw/timer/renesas_*.h
 
 Renesas RX peripherals
 M: Yoshinori Sato <ysato@users.sourceforge.jp>
-S: Maintained
+S: Odd Fixes
 F: hw/intc/rx_icu.c
 F: hw/rx/
 F: include/hw/intc/rx_icu.h
@@ -2109,6 +2123,7 @@ S: Maintained
 F: audio/
 F: hw/audio/
 F: include/hw/audio/
+F: qapi/audio.json
 F: tests/qtest/ac97-test.c
 F: tests/qtest/es1370-test.c
 F: tests/qtest/intel-hda-test.c
@@ -2488,7 +2503,9 @@ F: monitor/monitor-internal.h
 F: monitor/qmp*
 F: monitor/misc.c
 F: monitor/monitor.c
+F: qapi/control.json
 F: qapi/error.json
+F: qapi/introspect.json
 F: docs/devel/*qmp-*
 F: docs/interop/*qmp-*
 F: scripts/qmp/
@@ -2515,7 +2532,7 @@ R: Thomas Huth <thuth@redhat.com>
 S: Maintained
 F: tests/qtest/fuzz/
 F: scripts/oss-fuzz/
-F: docs/devel/fuzzing.txt
+F: docs/devel/fuzzing.rst
 
 Register API
 M: Alistair Francis <alistair@alistair23.me>
@@ -2549,6 +2566,7 @@ S: Maintained
 F: trace/
 F: trace-events
 F: docs/qemu-option-trace.rst.inc
+F: qapi/trace.json
 F: scripts/tracetool.py
 F: scripts/tracetool/
 F: scripts/qemu-trace-stap*
@@ -2608,6 +2626,7 @@ M: Daniel P. Berrange <berrange@redhat.com>
 S: Maintained
 F: crypto/
 F: include/crypto/
+F: qapi/crypto.json
 F: tests/test-crypto-*
 F: tests/benchmark-crypto-*
 F: tests/crypto-tls-*
@@ -2795,7 +2814,7 @@ F: scripts/gensyscalls.sh
 Tiny Code Generator (TCG)
 -------------------------
 Common TCG code
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 S: Maintained
 F: tcg/
 F: include/tcg/
@@ -2824,7 +2843,7 @@ F: tcg/arm/
 F: disas/arm.c
 
 i386 TCG target
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 S: Maintained
 F: tcg/i386/
 F: disas/i386.c
@@ -2839,7 +2858,7 @@ S: Odd Fixes
 F: tcg/mips/
 
 PPC TCG target
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 S: Odd Fixes
 F: tcg/ppc/
 F: disas/ppc.c
@@ -2853,7 +2872,7 @@ F: tcg/riscv/
 F: disas/riscv.c
 
 S390 TCG target
-M: Richard Henderson <rth@twiddle.net>
+M: Richard Henderson <richard.henderson@linaro.org>
 S: Maintained
 F: tcg/s390/
 F: disas/s390.c
@@ -2960,6 +2979,7 @@ R: Fam Zheng <fam@euphon.net>
 L: qemu-block@nongnu.org
 S: Supported
 F: block/nvme*
+F: include/block/nvme.h
 T: git https://github.com/stefanha/qemu.git block
 
 Bootdevice
@@ -3144,6 +3164,7 @@ S: Maintained
 F: .gitlab-ci.yml
 F: .gitlab-ci.d/crossbuilds.yml
 F: .gitlab-ci.d/*py
+F: scripts/ci/gitlab-pipeline-status
 
 Guest Test Compilation Support
 M: Alex Bennée <alex.bennee@linaro.org>

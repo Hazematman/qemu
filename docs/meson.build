@@ -27,7 +27,8 @@ if sphinx_build.found()
   build_docs = (sphinx_build_test_out.returncode() == 0)
 
   if not build_docs
-    warning('@0@ exists but it is either too old or uses too old a Python version'.format(get_option('sphinx_build')))
+    warning('@0@ is either too old or uses too old a Python version'
+            .format(sphinx_build.full_path()))
     if get_option('docs').enabled()
       error('Install a Python 3 version of python-sphinx')
     endif
@@ -59,6 +60,7 @@ if build_docs
     'tools': {
         'qemu-img.1': (have_tools ? 'man1' : ''),
         'qemu-nbd.8': (have_tools ? 'man8' : ''),
+        'qemu-pr-helper.8': (have_tools ? 'man8' : ''),
         'qemu-trace-stap.1': (config_host.has_key('CONFIG_TRACE_SYSTEMTAP') ? 'man1' : ''),
         'virtfs-proxy-helper.1': (have_virtfs_proxy_helper ? 'man1' : ''),
         'virtiofsd.1': (have_virtiofsd ? 'man1' : ''),

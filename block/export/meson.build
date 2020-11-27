@@ -1,2 +1,5 @@
 blockdev_ss.add(files('export.c'))
-blockdev_ss.add(when: ['CONFIG_LINUX', 'CONFIG_VHOST_USER'], if_true: files('vhost-user-blk-server.c'))
+
+if have_vhost_user_blk_server
+    blockdev_ss.add(files('vhost-user-blk-server.c'))
+endif

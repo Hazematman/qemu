@@ -2751,7 +2751,6 @@ out:
     qemu_progress_end();
     qemu_opts_del(opts);
     qemu_opts_free(create_opts);
-    qemu_opts_del(sn_opts);
     qobject_unref(open_opts);
     blk_unref(s.target);
     if (s.src) {
@@ -2763,6 +2762,7 @@ out:
     g_free(s.src_sectors);
     g_free(s.src_alignment);
 fail_getopt:
+    qemu_opts_del(sn_opts);
     g_free(options);
 
     return !!ret;
@@ -5466,7 +5466,6 @@ int main(int argc, char **argv)
     const img_cmd_t *cmd;
     const char *cmdname;
     Error *local_error = NULL;
-    char *trace_file = NULL;
     int c;
     static const struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
@@ -5516,8 +5515,7 @@ int main(int argc, char **argv)
             printf(QEMU_IMG_VERSION);
             return 0;
         case 'T':
-            g_free(trace_file);
-            trace_file = trace_opt_parse(optarg);
+            trace_opt_parse(optarg);
             break;
         }
     }
@@ -5535,7 +5533,7 @@ int main(int argc, char **argv)
     if (!trace_init_backends()) {
         exit(1);
     }
-    trace_init_file(trace_file);
+    trace_init_file();
     qemu_set_log(LOG_TRACE);
 
     /* find the command */

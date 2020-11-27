@@ -136,7 +136,7 @@ typedef struct VhostUserMemory {
 } VhostUserMemory;
 
 typedef struct VhostUserMemRegMsg {
-    uint32_t padding;
+    uint64_t padding;
     VhostUserMemoryRegion region;
 } VhostUserMemRegMsg;
 
@@ -392,7 +392,8 @@ struct VuDev {
     bool broken;
     uint16_t max_queues;
 
-    /* @read_msg: custom method to read vhost-user message
+    /*
+     * @read_msg: custom method to read vhost-user message
      *
      * Read data from vhost_user socket fd and fill up
      * the passed VhostUserMsg *vmsg struct.
@@ -409,15 +410,19 @@ struct VuDev {
      *
      */
     vu_read_msg_cb read_msg;
-    /* @set_watch: add or update the given fd to the watch set,
-     * call cb when condition is met */
+
+    /*
+     * @set_watch: add or update the given fd to the watch set,
+     * call cb when condition is met.
+     */
     vu_set_watch_cb set_watch;
 
     /* @remove_watch: remove the given fd from the watch set */
     vu_remove_watch_cb remove_watch;
 
-    /* @panic: encountered an unrecoverable error, you may try to
-     * re-initialize */
+    /*
+     * @panic: encountered an unrecoverable error, you may try to re-initialize
+     */
     vu_panic_cb panic;
     const VuDevIface *iface;
 

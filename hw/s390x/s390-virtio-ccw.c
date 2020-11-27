@@ -28,7 +28,7 @@
 #include "qemu/error-report.h"
 #include "qemu/option.h"
 #include "qemu/qemu-print.h"
-#include "s390-pci-bus.h"
+#include "hw/s390x/s390-pci-bus.h"
 #include "sysemu/reset.h"
 #include "hw/s390x/storage-keys.h"
 #include "hw/s390x/storage-attributes.h"
@@ -485,6 +485,10 @@ static void s390_machine_reset(MachineState *machine)
         break;
     default:
         g_assert_not_reached();
+    }
+
+    CPU_FOREACH(t) {
+        run_on_cpu(t, s390_do_cpu_set_diag318, RUN_ON_CPU_HOST_ULONG(0));
     }
     s390_ipl_clear_reset_request();
 }

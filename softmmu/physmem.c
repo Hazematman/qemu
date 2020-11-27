@@ -6,7 +6,7 @@
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
+ * version 2.1 of the License, or (at your option) any later version.
  *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -1756,15 +1756,15 @@ int qemu_ram_resize(RAMBlock *block, ram_addr_t newsize, Error **errp)
 
     if (!(block->flags & RAM_RESIZEABLE)) {
         error_setg_errno(errp, EINVAL,
-                         "Length mismatch: %s: 0x" RAM_ADDR_FMT
-                         " in != 0x" RAM_ADDR_FMT, block->idstr,
+                         "Size mismatch: %s: 0x" RAM_ADDR_FMT
+                         " != 0x" RAM_ADDR_FMT, block->idstr,
                          newsize, block->used_length);
         return -EINVAL;
     }
 
     if (block->max_length < newsize) {
         error_setg_errno(errp, EINVAL,
-                         "Length too large: %s: 0x" RAM_ADDR_FMT
+                         "Size too large: %s: 0x" RAM_ADDR_FMT
                          " > 0x" RAM_ADDR_FMT, block->idstr,
                          newsize, block->max_length);
         return -EINVAL;
@@ -2723,22 +2723,14 @@ static int memory_access_size(MemoryRegion *mr, unsigned l, hwaddr addr)
 
 static bool prepare_mmio_access(MemoryRegion *mr)
 {
-    bool unlocked = !qemu_mutex_iothread_locked();
     bool release_lock = false;
 
-    if (unlocked) {
+    if (!qemu_mutex_iothread_locked()) {
         qemu_mutex_lock_iothread();
-        unlocked = false;
         release_lock = true;
     }
     if (mr->flush_coalesced_mmio) {
-        if (unlocked) {
-            qemu_mutex_lock_iothread();
-        }
         qemu_flush_coalesced_mmio_buffer();
-        if (unlocked) {
-            qemu_mutex_unlock_iothread();
-        }
     }
 
     return release_lock;

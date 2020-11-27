@@ -205,8 +205,15 @@ static bool memory_region_ioeventfd_before(MemoryRegionIoeventfd *a,
 static bool memory_region_ioeventfd_equal(MemoryRegionIoeventfd *a,
                                           MemoryRegionIoeventfd *b)
 {
-    return !memory_region_ioeventfd_before(a, b)
-        && !memory_region_ioeventfd_before(b, a);
+    if (int128_eq(a->addr.start, b->addr.start) &&
+        (!int128_nz(a->addr.size) || !int128_nz(b->addr.size) ||
+         (int128_eq(a->addr.size, b->addr.size) &&
+          (a->match_data == b->match_data) &&
+          ((a->match_data && (a->data == b->data)) || !a->match_data) &&
+          (a->e == b->e))))
+        return true;
+
+    return false;
 }
 
 /* Range of memory in the global map.  Addresses are absolute. */
@@ -1806,7 +1813,10 @@ bool memory_region_is_ram_device(MemoryRegion *mr)
 uint8_t memory_region_get_dirty_log_mask(MemoryRegion *mr)
 {
     uint8_t mask = mr->dirty_log_mask;
-    if (global_dirty_log && mr->ram_block) {
+    RAMBlock *rb = mr->ram_block;
+
+    if (global_dirty_log && ((rb && qemu_ram_is_migratable(rb)) ||
+                             memory_region_is_iommu(mr))) {
         mask |= (1 << DIRTY_MEMORY_MIGRATION);
     }
     return mask;
@@ -1837,6 +1847,19 @@ static int memory_region_update_iommu_notify_flags(IOMMUMemoryRegion *iommu_mr,
 
     if (!ret) {
         iommu_mr->iommu_notify_flags = flags;
+    }
+    return ret;
+}
+
+int memory_region_iommu_set_page_size_mask(IOMMUMemoryRegion *iommu_mr,
+                                           uint64_t page_size_mask,
+                                           Error **errp)
+{
+    IOMMUMemoryRegionClass *imrc = IOMMU_MEMORY_REGION_GET_CLASS(iommu_mr);
+    int ret = 0;
+
+    if (imrc->iommu_set_page_size_mask) {
+        ret = imrc->iommu_set_page_size_mask(iommu_mr, page_size_mask, errp);
     }
     return ret;
 }

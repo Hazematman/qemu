@@ -1,6 +1,6 @@
 project('qemu', ['c'], meson_version: '>=0.55.0',
-        default_options: ['warning_level=1', 'c_std=gnu99', 'cpp_std=gnu++11',
-                          'b_colorout=auto'],
+        default_options: ['warning_level=1', 'c_std=gnu99', 'cpp_std=gnu++11', 'b_colorout=auto'] +
+                         (meson.version().version_compare('>=0.56.0') ? [ 'b_staticpic=false' ] : []),
         version: run_command('head', meson.source_root() / 'VERSION').stdout().strip())
 
 not_found = dependency('', required: false)
@@ -74,10 +74,15 @@ else
 endif
 
 accelerator_targets = { 'CONFIG_KVM': kvm_targets }
+if cpu in ['x86', 'x86_64', 'arm', 'aarch64']
+  # i368 emulator provides xenpv machine type for multiple architectures
+  accelerator_targets += {
+    'CONFIG_XEN': ['i386-softmmu', 'x86_64-softmmu'],
+  }
+endif
 if cpu in ['x86', 'x86_64']
   accelerator_targets += {
     'CONFIG_HAX': ['i386-softmmu', 'x86_64-softmmu'],
-    'CONFIG_XEN': ['i386-softmmu', 'x86_64-softmmu'],
     'CONFIG_HVF': ['x86_64-softmmu'],
     'CONFIG_WHPX': ['i386-softmmu', 'x86_64-softmmu'],
   }
@@ -485,10 +490,15 @@ if have_system and not get_option('curses').disabled()
       return 0;
     }'''
 
-  curses = dependency((targetos == 'windows' ? 'ncurses' : 'ncursesw'),
-                      required: false,
-                      method: 'pkg-config',
-                      static: enable_static)
+  curses_dep_list = targetos == 'windows' ? ['ncurses', 'ncursesw'] : ['ncursesw']
+  foreach curses_dep : curses_dep_list
+    if not curses.found()
+      curses = dependency(curses_dep,
+                          required: false,
+                          method: 'pkg-config',
+                          static: enable_static)
+    endif
+  endforeach
   msg = get_option('curses').enabled() ? 'curses library not found' : ''
   if curses.found()
     if cc.links(curses_test, dependencies: [curses])
@@ -644,9 +654,8 @@ if get_option('vnc').enabled()
   vnc = declare_dependency() # dummy dependency
   png = dependency('libpng', required: get_option('vnc_png'),
                    method: 'pkg-config', static: enable_static)
-  jpeg = cc.find_library('jpeg', has_headers: ['jpeglib.h'],
-                         required: get_option('vnc_jpeg'),
-                         static: enable_static)
+  jpeg = dependency('libjpeg', required: get_option('vnc_jpeg'),
+                    method: 'pkg-config', static: enable_static)
   sasl = cc.find_library('sasl2', has_headers: ['sasl/sasl.h'],
                          required: get_option('vnc_sasl'),
                          static: enable_static)
@@ -736,6 +745,34 @@ if not has_malloc_trim and get_option('malloc_trim').enabled()
   endif
 endif
 
+# Check whether the glibc provides statx()
+
+statx_test = '''
+  #ifndef _GNU_SOURCE
+  #define _GNU_SOURCE
+  #endif
+  #include <sys/stat.h>
+  int main(void) {
+    struct statx statxbuf;
+    statx(0, "", 0, STATX_BASIC_STATS, &statxbuf);
+    return 0;
+  }'''
+
+has_statx = cc.links(statx_test)
+
+have_vhost_user_blk_server = (targetos == 'linux' and
+    'CONFIG_VHOST_USER' in config_host)
+
+if get_option('vhost_user_blk_server').enabled()
+    if targetos != 'linux'
+        error('vhost_user_blk_server requires linux')
+    elif 'CONFIG_VHOST_USER' not in config_host
+        error('vhost_user_blk_server requires vhost-user support')
+    endif
+elif get_option('vhost_user_blk_server').disabled() or not have_system
+    have_vhost_user_blk_server = false
+endif
+
 #################
 # config-host.h #
 #################
@@ -760,6 +797,7 @@ config_host_data.set('CONFIG_MPATH_NEW_API', mpathpersist_new_api)
 config_host_data.set('CONFIG_CURSES', curses.found())
 config_host_data.set('CONFIG_SDL', sdl.found())
 config_host_data.set('CONFIG_SDL_IMAGE', sdl_image.found())
+config_host_data.set('CONFIG_VHOST_USER_BLK_SERVER', have_vhost_user_blk_server)
 config_host_data.set('CONFIG_VNC', vnc.found())
 config_host_data.set('CONFIG_VNC_JPEG', jpeg.found())
 config_host_data.set('CONFIG_VNC_PNG', png.found())
@@ -768,10 +806,13 @@ config_host_data.set('CONFIG_XKBCOMMON', xkbcommon.found())
 config_host_data.set('CONFIG_KEYUTILS', keyutils.found())
 config_host_data.set('CONFIG_GETTID', has_gettid)
 config_host_data.set('CONFIG_MALLOC_TRIM', has_malloc_trim)
+config_host_data.set('CONFIG_STATX', has_statx)
 config_host_data.set('QEMU_VERSION', '"@0@"'.format(meson.project_version()))
 config_host_data.set('QEMU_VERSION_MAJOR', meson.project_version().split('.')[0])
 config_host_data.set('QEMU_VERSION_MINOR', meson.project_version().split('.')[1])
 config_host_data.set('QEMU_VERSION_MICRO', meson.project_version().split('.')[2])
+
+config_host_data.set('HAVE_SYS_IOCCOM_H', cc.has_header('sys/ioccom.h'))
 
 ignored = ['CONFIG_QEMU_INTERP_PREFIX'] # actually per-target
 arrays = ['CONFIG_AUDIO_DRIVERS', 'CONFIG_BDRV_RW_WHITELIST', 'CONFIG_BDRV_RO_WHITELIST']
@@ -1434,11 +1475,7 @@ trace_events_subdirs += [
   'util',
 ]
 
-vhost_user = not_found
-if 'CONFIG_VHOST_USER' in config_host
-  subdir('contrib/libvhost-user')
-endif
-
+subdir('contrib/libvhost-user')
 subdir('qapi')
 subdir('qobject')
 subdir('stubs')
@@ -1918,7 +1955,7 @@ if host_machine.system() == 'windows'
     '@OUTPUT@',
     get_option('prefix'),
     meson.current_source_dir(),
-    host_machine.cpu_family(),
+    host_machine.cpu(),
     '--',
     '-DDISPLAYVERSION=' + meson.project_version(),
   ]
@@ -2086,11 +2123,13 @@ summary_info += {'madvise':           config_host.has_key('CONFIG_MADVISE')}
 summary_info += {'posix_madvise':     config_host.has_key('CONFIG_POSIX_MADVISE')}
 summary_info += {'posix_memalign':    config_host.has_key('CONFIG_POSIX_MEMALIGN')}
 summary_info += {'libcap-ng support': config_host.has_key('CONFIG_LIBCAP_NG')}
+summary_info += {'vhost-kernel support': config_host.has_key('CONFIG_VHOST_KERNEL')}
 summary_info += {'vhost-net support': config_host.has_key('CONFIG_VHOST_NET')}
 summary_info += {'vhost-crypto support': config_host.has_key('CONFIG_VHOST_CRYPTO')}
 summary_info += {'vhost-scsi support': config_host.has_key('CONFIG_VHOST_SCSI')}
 summary_info += {'vhost-vsock support': config_host.has_key('CONFIG_VHOST_VSOCK')}
-summary_info += {'vhost-user support': config_host.has_key('CONFIG_VHOST_KERNEL')}
+summary_info += {'vhost-user support': config_host.has_key('CONFIG_VHOST_USER')}
+summary_info += {'vhost-user-blk server support': have_vhost_user_blk_server}
 summary_info += {'vhost-user-fs support': config_host.has_key('CONFIG_VHOST_USER_FS')}
 summary_info += {'vhost-vdpa support': config_host.has_key('CONFIG_VHOST_VDPA')}
 summary_info += {'Trace backends':    config_host['TRACE_BACKENDS']}

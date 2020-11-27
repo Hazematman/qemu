@@ -59,7 +59,7 @@ static void radeon_regs_write(void *opaque, hwaddr addr, uint64_t value, unsigne
     UNUSED(d);
     UNUSED(pci_dev);
 
-    printf("REGS    Write Ordered, addr=%x, value=%lu, size=%d\n", (unsigned) addr, value, size);
+    printf("REGS Write Ordered, addr=%x, value=%lu, size=%d\n", (unsigned) addr, value, size);
 
     switch (addr) {
         default:

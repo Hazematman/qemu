@@ -75,9 +75,45 @@
 
 #define RADEON_PCI_GART_PAGE                0x017c
 
+#define RADEON_CP_IB_BASE                   0x0738
+#define RADEON_CP_IB_BUFSZ                  0x073c
+
 /***********************************************************************/
 
+/*****************************************************************/
+/* RADEON CP defines */
+
+#define CP_PACKET_MASK      0xC0000000
+#define CP_PACKET0			0x00000000
+#define		PACKET0_BASE_INDEX_SHIFT	0
+#define		PACKET0_BASE_INDEX_MASK		(0xffff << 0)
+#define		PACKET0_COUNT_SHIFT		16
+#define		PACKET0_COUNT_MASK		(0x3fff << 16)
+#define CP_PACKET1			0x40000000
+#define CP_PACKET2			0x80000000
+#define		PACKET2_PAD_SHIFT		0
+#define		PACKET2_PAD_MASK		(0x3fffffff << 0)
+#define CP_PACKET3			0xC0000000
+#define		PACKET3_IT_OPCODE_SHIFT		8
+#define		PACKET3_IT_OPCODE_MASK		(0xff << 8)
+#define		PACKET3_COUNT_SHIFT		16
+#define		PACKET3_COUNT_MASK		(0x3fff << 16)
+
+/*****************************************************************/
+
 #define UNUSED(x) (void)(x)
+
+/* sizes must be power of 2 in PCI */
+#define RADEON_REGS_SIZE (64*1024)
+#define RADEON_VRAM_SIZE (128*1024*1024)
+#define RADEON_IO_SIZE   (256)
+
+#define RADEON_PAGE_SIZE 4096
+#define RADEON_PAGE_SHIFT 12
+
+#define RADEON_CB_SIZE (16)
+#define RADEON_PACKET_SIZE (RADEON_CB_SIZE*4)
+
 
 typedef struct PCIRadeonDevState {
     PCIDevice parent_obj;
@@ -100,6 +136,8 @@ typedef struct PCIRadeonDevState {
 
     int do_dma;
 
+    uint32_t cmds[RADEON_CB_SIZE];
+
     struct {
         uint32_t radeon_mem_str_cntl;
         uint32_t radeon_rbbm_status;
@@ -112,6 +150,16 @@ typedef struct PCIRadeonDevState {
         uint32_t radeon_cp_wptr;
         uint32_t radeon_cp_rptr;
         uint32_t radeon_gart_page; // TODO this might not be right
+
+        uint32_t radeon_ib_base;
+        uint32_t radeon_ib_size;
+
+        uint32_t radeon_scratch_reg_0;
+        uint32_t radeon_scratch_reg_1;
+        uint32_t radeon_scratch_reg_2;
+        uint32_t radeon_scratch_reg_3;
+        uint32_t radeon_scratch_reg_4;
+        uint32_t radeon_scratch_reg_5;
     } dev_regs;
 
 
@@ -119,19 +167,18 @@ typedef struct PCIRadeonDevState {
 
 #define TYPE_PCI_RADEON_DEV "pci-radeondev"
 #define PCI_RADEON_DEV(obj)     OBJECT_CHECK(PCIRadeonDevState, (obj), TYPE_PCI_RADEON_DEV)
-/* sizes must be power of 2 in PCI */
-#define RADEON_REGS_SIZE (64*1024)
-#define RADEON_VRAM_SIZE (128*1024*1024)
-#define RADEON_IO_SIZE   (256)
-
-#define RADEON_PAGE_SIZE 4096
-#define RADEON_PAGE_SHIFT 12
 
 static uint8_t vram[RADEON_VRAM_SIZE];
 
 static void qdev_pci_radeon_dev_reset(DeviceState *dev)
 {
     printf("Reset World\n");
+}
+
+static void radeon_print_regs(PCIRadeonDevState *d)
+{
+    printf("read 0x%x write 0x%x\n", qatomic_read(&d->dev_regs.radeon_cp_rptr),
+                                    qatomic_read(&d->dev_regs.radeon_cp_wptr));
 }
 
 /* Used for debugging */
@@ -150,11 +197,11 @@ static void radeon_dump_gart_table(PCIRadeonDevState *d)
 
 }
 
-static uint32_t radeon_translate_addr(PCIRadeonDevState *d)
+static uint32_t radeon_translate_addr(PCIRadeonDevState *d, uint32_t addr)
 {
     // TODO I'm not sure if this address translation works in general
     // Hardcodes offset as what is used to look up the page
-    uint32_t offset = d->dev_regs.radeon_cp_base - d->dev_regs.radeon_lo_addr;
+    uint32_t offset = addr - d->dev_regs.radeon_lo_addr;
     uint32_t gpu_page = (offset >> RADEON_PAGE_SHIFT);
     uint32_t gart_lookup_addr = d->dev_regs.radeon_pt_base + gpu_page*4;
     uint32_t gart_addr;
@@ -167,11 +214,12 @@ static void radeon_dma_command_thread(PCIRadeonDevState *d)
 {
     PCIDevice *dev = (PCIDevice *)d;
     UNUSED(dev);
-    static uint32_t buffer[128] = {1};
-    dma_addr_t addr = radeon_translate_addr(d);
+    static uint32_t buffer[128];
+    dma_addr_t addr = radeon_translate_addr(d, addr);
     size_t dma_size = d->dev_regs.radeon_cp_wptr*4;
-    int result = pci_dma_read((PCIDevice *)d, (dma_addr_t)(addr), (void *)&buffer[0], (dma_addr_t)dma_size);
-    
+    pci_dma_read((PCIDevice *)d, (dma_addr_t)(addr), (void *)&buffer[0], (dma_addr_t)dma_size);
+
+#if 0
     printf("RADEON AIC 0x%x 0x%x 0x%x\n", d->dev_regs.radeon_lo_addr, d->dev_regs.radeon_hi_addr, d->dev_regs.radeon_pt_base);
     printf("RADEON DMA buffer from addr 0x%lx (0x%lx)(%d)\n", d->dev_regs.radeon_cp_base, addr, result);
     for(int i=0; i<dma_size/4; i++)
@@ -179,6 +227,7 @@ static void radeon_dma_command_thread(PCIRadeonDevState *d)
         printf("\t0x%x\n", buffer[i]);
     }
     printf("DONE RADEON DMA BUFFER\n");
+#endif
     UNUSED(radeon_dump_gart_table);
     return;
 }
@@ -186,23 +235,180 @@ static void radeon_dma_command_thread(PCIRadeonDevState *d)
 static void radeon_dma_command(PCIRadeonDevState *d)
 {
     //qatomic_set(&d->do_dma, 1);
-    radeon_dma_command_thread(d);
+    //radeon_dma_command_thread(d);
 }
 
+static void radeon_write_reg(PCIRadeonDevState *d, uint32_t addr, uint32_t val)
+{
+    UNUSED(radeon_dma_command);
+
+    switch (addr) {
+        case RADEON_GEN_INT_CNTL:
+            /* TODO figure out how to actually use interrupts */
+            d->dev_regs.radeon_mem_str_cntl = val;
+            break;
+        case RADEON_AIC_CNTL:
+            d->dev_regs.radeon_aic_cntl = val;
+            break;
+        case RADEON_AIC_LO_ADDR:
+            d->dev_regs.radeon_lo_addr = val;
+            break;
+        case RADEON_AIC_HI_ADDR:
+            d->dev_regs.radeon_hi_addr = val;
+            break;
+        case RADEON_AIC_PT_BASE:
+            d->dev_regs.radeon_pt_base = val;
+            break;
+        case RADEON_CP_RB_CNTL:
+            printf("RADEON Wrote RB status 0x%x\n", val);
+            break;
+        case RADEON_CP_RB_BASE:
+            d->dev_regs.radeon_cp_base = val;
+            break;
+        case RADEON_CP_RB_WPTR:
+            d->dev_regs.radeon_cp_wptr = val;
+            radeon_print_regs(d);
+            break;
+        case RADEON_PCI_GART_PAGE:
+            d->dev_regs.radeon_gart_page = val;
+            break;
+        case RADEON_CP_IB_BASE:
+            d->dev_regs.radeon_ib_base = val;
+            break;
+        case RADEON_CP_IB_BUFSZ:
+            d->dev_regs.radeon_ib_size = val;
+            break;
+        case RADEON_SCRATCH_REG0:
+            d->dev_regs.radeon_scratch_reg_0 = val;
+            break;
+        case RADEON_SCRATCH_REG1:
+            d->dev_regs.radeon_scratch_reg_1 = val;
+            break;
+        case RADEON_SCRATCH_REG2:
+            d->dev_regs.radeon_scratch_reg_2 = val;
+            break;
+        case RADEON_SCRATCH_REG3:
+            d->dev_regs.radeon_scratch_reg_3 = val;
+            break;
+        case RADEON_SCRATCH_REG4:
+            d->dev_regs.radeon_scratch_reg_4 = val;
+            break;
+        case RADEON_SCRATCH_REG5:
+            d->dev_regs.radeon_scratch_reg_5 = val;
+            break;
+        default:
+            printf("WRITE IO not used addr=%x, value=%0x\n", (unsigned) addr, val);
+            break;
+     
+    }  
+}
+
+static void radeon_process_cb(PCIRadeonDevState *d, uint32_t *buf, size_t size)
+{
+    static int packet_type = -1;
+    static uint32_t count;
+    static uint32_t cur_reg;
+
+    for(int i=0; i < size; i++)
+    {
+        uint32_t val = buf[i];
+        if(packet_type == -1)
+        {
+            switch(val & CP_PACKET_MASK)
+            {
+                case CP_PACKET0:
+                    cur_reg = (val & PACKET0_BASE_INDEX_MASK) << 2;
+                    count = ((val & PACKET0_COUNT_MASK) >> PACKET0_COUNT_SHIFT)+1;
+                    packet_type = 0;
+                    printf("CP0 on 0x%x\n", cur_reg);
+                    break;
+                case CP_PACKET1:
+                    printf("Got CP_PACKET1 don't know how to handle this\n");
+                    break;
+                case CP_PACKET2:
+                    /* This is a NOP */
+                    break;
+                case CP_PACKET3:
+                    printf("Got CP_PACKET3 don't know how to handle this\n");
+                    break;
+            }
+        }
+        else if(packet_type == 0)
+        {
+            radeon_write_reg(d, cur_reg, val);
+            uint32_t old_reg = cur_reg;
+            cur_reg += 4;
+            count -= 1;
+
+            if(count == 0)
+            {
+                packet_type = -1;
+            }
+
+            /* If we are writing to RADEON_CP_IB_BUFSZ then we can start */
+            /* executing the indrect buffer */
+            if(old_reg == RADEON_CP_IB_BUFSZ)
+            {
+                uint32_t ib_size = (val << 2);
+                uint32_t *ib_cmds = malloc(ib_size);
+                uint32_t addr = radeon_translate_addr(d, qatomic_read(&d->dev_regs.radeon_ib_base));
+                pci_dma_read((PCIDevice *)d, (dma_addr_t)(addr), (void *)ib_cmds, (ib_size));
+
+                printf("RADEON IB \n");
+                for(int i=0; i < val; i++)
+                {
+                    printf("\t0x%x\n", ib_cmds[i]);
+                }
+
+                /* TODO how to make this function recursive... */
+                radeon_process_cb(d, ib_cmds, val);
+
+                free(ib_cmds);
+            }
+        }
+    }
+}
 
 static void *radeon_cp_thread(void *opaque)
 {
     PCIRadeonDevState *d = (PCIRadeonDevState *) opaque;
     PCIDevice *pci_dev = (PCIDevice *) opaque;
+    bool processing = false;
 
     UNUSED(pci_dev);
-    while(false)
+    UNUSED(radeon_dma_command_thread);
+    while(true)
     {
         /* If we have started a DMA */
-        if(qatomic_read(&d->do_dma) == 1)
+        if(!processing && qatomic_read(&d->dev_regs.radeon_cp_wptr) != qatomic_read(&d->dev_regs.radeon_cp_rptr))
+        { 
+            //radeon_dma_command_thread(d);
+            /* Read 16 words from the command buffer */
+            uint32_t cmd_buffer_size = qatomic_read(&d->dev_regs.radeon_cp_wptr) - qatomic_read(&d->dev_regs.radeon_cp_rptr);
+            if((cmd_buffer_size % RADEON_CB_SIZE) == 0)
+            {
+                uint32_t addr = radeon_translate_addr(d, qatomic_read(&d->dev_regs.radeon_cp_base)+qatomic_read(&d->dev_regs.radeon_cp_rptr)*4);
+                pci_dma_read((PCIDevice *)d, (dma_addr_t)(addr), (void *)&d->cmds[0], (dma_addr_t)RADEON_PACKET_SIZE);
+                processing = true;
+                qatomic_set(&d->dev_regs.radeon_cp_rptr, qatomic_read(&d->dev_regs.radeon_cp_rptr)+RADEON_CB_SIZE);
+                printf("Do radeon CMD\n");
+            }
+            else
+            {
+                printf("CMD is not on RADEON_CB_SIZE word offset\n");
+            }
+        }
+
+        if(processing)
         {
-            qatomic_set(&d->do_dma, 0);
-            radeon_dma_command_thread(d);
+            printf("RADEON CMD BUF\n");
+            for(int i=0; i < RADEON_CB_SIZE; i++)
+            {
+                printf("\t0x%x\n", d->cmds[i]);
+            }
+            radeon_process_cb(d, d->cmds, RADEON_CB_SIZE);
+            processing = false;
+
         }
     }
 
@@ -217,42 +423,7 @@ static void radeon_regs_write(void *opaque, hwaddr addr, uint64_t value, unsigne
     UNUSED(d);
     UNUSED(pci_dev);
 
-    switch (addr) {
-        case RADEON_GEN_INT_CNTL:
-            /* TODO figure out how to actually use interrupts */
-            d->dev_regs.radeon_mem_str_cntl = (uint32_t)value;
-            break;
-        case RADEON_AIC_CNTL:
-            d->dev_regs.radeon_aic_cntl = (uint32_t)value;
-            break;
-        case RADEON_AIC_LO_ADDR:
-            d->dev_regs.radeon_lo_addr = (uint32_t)value;
-            break;
-        case RADEON_AIC_HI_ADDR:
-            d->dev_regs.radeon_hi_addr = (uint32_t)value;
-            break;
-        case RADEON_AIC_PT_BASE:
-            d->dev_regs.radeon_pt_base = (uint32_t)value;
-            break;
-        case RADEON_CP_RB_CNTL:
-            printf("RADEON Wrote RB status 0x%x\n", (uint32_t)value);
-            break;
-        case RADEON_CP_RB_BASE:
-            d->dev_regs.radeon_cp_base = (uint32_t)value;
-            break;
-        case RADEON_CP_RB_WPTR:
-            d->dev_regs.radeon_cp_wptr = (uint32_t)value;
-            radeon_dma_command(d);
-            break;
-        case RADEON_PCI_GART_PAGE:
-            d->dev_regs.radeon_gart_page = (uint32_t)value;
-            break;
-        default:
-            printf("WRITE IO not used addr=%x, value=%lu, size=%d\n", (unsigned) addr, value, size);
-            break;
-     
-    }
-
+    radeon_write_reg(d, addr, value);
 }
 
 static uint64_t radeon_regs_read(void *opaque, hwaddr addr, unsigned size)
@@ -286,6 +457,24 @@ static uint64_t radeon_regs_read(void *opaque, hwaddr addr, unsigned size)
         case RADEON_GEN_INT_CNTL:
             /* TODO figure out how to actually use interrupts */
             return d->dev_regs.radeon_mem_str_cntl;
+            break;
+        case RADEON_SCRATCH_REG0:
+            return d->dev_regs.radeon_scratch_reg_0;
+            break;
+        case RADEON_SCRATCH_REG1:
+            return d->dev_regs.radeon_scratch_reg_1;
+            break;
+        case RADEON_SCRATCH_REG2:
+            return d->dev_regs.radeon_scratch_reg_2;
+            break;
+        case RADEON_SCRATCH_REG3:
+            return d->dev_regs.radeon_scratch_reg_3;
+            break;
+        case RADEON_SCRATCH_REG4:
+            return d->dev_regs.radeon_scratch_reg_4;
+            break;
+        case RADEON_SCRATCH_REG5:
+            return d->dev_regs.radeon_scratch_reg_5;
             break;
         default:
             printf("READ IO not used addr =%x, size=%d\n", (unsigned) addr, size);
